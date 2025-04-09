@@ -20,4 +20,8 @@ app.get("/", (req, res) => {
     res.send({ statusCode: 200, status: "OK" });
 });
 
+import userRouter from "./routers/user.router.js";
+
+app.use("/api/v1/users", userRouter);
+
 export { app };
