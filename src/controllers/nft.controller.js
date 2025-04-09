@@ -1,23 +1,19 @@
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { NFT } from "../models/nft.model.js";
 import { User } from "../models/user.model.js";
-import { Tournament } from "../models/tournament.model.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { ApiError } from "../utils/ApiError.js";
 
 export const mintNFT = asyncHandler(async (req, res) => {
-    const { tournamentId, name, description, imageUrl } = req.body;
-
-    const tournament = await Tournament.findById(tournamentId);
-    if (!tournament) {
-        throw new ApiError(404, "Tournament not found");
+    if (!req.user.isAdmin) {
+        throw new ApiError(403, "You are not allowed to mint NFTs");
     }
+    const { name, description, imageUrl } = req.body;
 
     const adminId = req.user._id;
 
     const newNFT = await NFT.create({
         owner: adminId,
-        tournament: tournament._id,
         name,
         description,
         imageUrl,

@@ -7,7 +7,7 @@ import { generateProfilePicture } from "../utils/pfpGenerator.js";
 import { uploadOnCloudinary, deleteFromCloudinary } from "../utils/cloudinary.js";
 
 export const registerUser = asyncHandler(async (req, res) => {
-    const { email, username, password } = req.body;
+    const { email, username, password, isAdmin } = req.body;
 
     if ([email, username, password].some((field) => field?.trim() === "")) {
         throw new ApiError(400, "No field can be empty");
@@ -29,6 +29,7 @@ export const registerUser = asyncHandler(async (req, res) => {
         password,
         avatar: pfp.url,
         avatarId: pfp.public_id,
+        isAdmin,
     });
 
     const createdUser = await User.findById(user._id).select("-password -refreshToken");

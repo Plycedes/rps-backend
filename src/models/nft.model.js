@@ -10,7 +10,7 @@ const nftSchema = new mongoose.Schema(
         tournament: {
             type: mongoose.Schema.Types.ObjectId,
             ref: "Tournament",
-            required: true,
+            default: null,
         },
         name: {
             type: String,
