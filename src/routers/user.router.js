@@ -9,6 +9,7 @@ import {
     changeCurrentPassword,
     getCurrentUser,
     updateUserAvatar,
+    updateUserBalance,
 } from "../controllers/user.controller.js";
 
 const router = Router();
@@ -16,12 +17,12 @@ const router = Router();
 router.route("/register").post(registerUser);
 router.route("/login").post(loginUser);
 router.route("/refresh-token").post(refreshAccessToken);
-
 router.route("/logout").post(verifyJWT, logoutUser);
-router.route("/change-password").post(verifyJWT, changeCurrentPassword);
 
 router.route("/current-user").get(verifyJWT, getCurrentUser);
 
+router.route("/change-password").post(verifyJWT, changeCurrentPassword);
 router.route("/update-avatar").post(verifyJWT, upload.single("avatar"), updateUserAvatar);
+router.route("/add-balance").post(verifyJWT, updateUserBalance);
 
 export default router;

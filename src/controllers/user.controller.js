@@ -225,3 +225,29 @@ export const updateUserAvatar = asyncHandler(async (req, res) => {
 
     return res.status(200).json(new ApiResponse(200, user, "Avatar updated successfully"));
 });
+
+export const updateUserBalance = asyncHandler(async (req, res) => {
+    const { amount } = req.body;
+    const userId = req.user._id;
+
+    if (typeof amount !== "number") {
+        throw new ApiError(400, "Amount must be a number");
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+        throw new ApiError(404, "User not found");
+    }
+
+    // Prevent negative balance
+    if (user.balance + amount < 0) {
+        throw new ApiError(400, "Insufficient balance");
+    }
+
+    user.balance += amount;
+    await user.save();
+
+    return res
+        .status(200)
+        .json(new ApiResponse(200, { balance: user.balance }, "Balance updated successfully"));
+});

@@ -28,10 +28,15 @@ const userSchema = new Schema(
         },
         walletId: {
             type: String,
+            default: 0,
         },
         avatarId: {
             type: String,
             required: true,
+        },
+        isAdmin: {
+            type: Boolean,
+            default: false,
         },
         password: {
             type: String,
