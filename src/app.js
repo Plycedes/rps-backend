@@ -21,7 +21,9 @@ app.get("/", (req, res) => {
 });
 
 import userRouter from "./routers/user.router.js";
+import nftRouter from "./routers/nft.router.js";
 
 app.use("/api/v1/users", userRouter);
+app.use("/api/v1/nfts", nftRouter);
 
 export { app };

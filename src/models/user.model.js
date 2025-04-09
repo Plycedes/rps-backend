@@ -25,10 +25,10 @@ const userSchema = new Schema(
         },
         balance: {
             type: Number,
+            default: 0,
         },
         walletId: {
             type: String,
-            default: 0,
         },
         avatarId: {
             type: String,

@@ -1,9 +1,9 @@
-import asyncHandler from "express-async-handler";
-import NFT from "../models/NFT.js";
-import User from "../models/User.js";
-import Tournament from "../models/Tournament.js";
-import ApiResponse from "../utils/ApiResponse.js";
-import ApiError from "../utils/ApiError.js";
+import { asyncHandler } from "../utils/asyncHandler.js";
+import { NFT } from "../models/nft.model.js";
+import { User } from "../models/user.model.js";
+import { Tournament } from "../models/tournament.model.js";
+import { ApiResponse } from "../utils/ApiResponse.js";
+import { ApiError } from "../utils/ApiError.js";
 
 export const mintNFT = asyncHandler(async (req, res) => {
     const { tournamentId, name, description, imageUrl } = req.body;
