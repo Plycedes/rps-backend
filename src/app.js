@@ -22,8 +22,10 @@ app.get("/", (req, res) => {
 
 import userRouter from "./routers/user.router.js";
 import nftRouter from "./routers/nft.router.js";
+import tournamentRouter from "./routers/tournament.router.js";
 
 app.use("/api/v1/users", userRouter);
 app.use("/api/v1/nfts", nftRouter);
+app.use("/api/v1/tournaments", tournamentRouter);
 
 export { app };

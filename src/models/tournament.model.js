@@ -32,6 +32,20 @@ const tournamentSchema = new mongoose.Schema(
             enum: ["pending", "ongoing", "completed"],
             default: "pending",
         },
+        winner: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "User",
+            default: null,
+        },
+        reward: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "NFT",
+            required: true,
+        },
+        endDate: {
+            type: Date,
+            required: true,
+        },
     },
     { timestamps: true }
 );
