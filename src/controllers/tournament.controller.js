@@ -68,6 +68,10 @@ export const completeTournament = asyncHandler(async (req, res) => {
     const { tournamentId } = req.body;
     const userId = req.user._id;
 
+    if (!req.user.isAdmin) {
+        throw new ApiError(403, "You are not an administrator");
+    }
+
     const tournament = await Tournament.findById(tournamentId)
         .populate("participants.user")
         .populate("reward");

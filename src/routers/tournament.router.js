@@ -17,6 +17,6 @@ router.route("/complete").post(verifyJWT, completeTournament);
 
 router.route("/get-active").get(verifyJWT, getActiveTournaments);
 router.route("/get-previous").get(verifyJWT, getPreviousTournaments);
-router.route("/get/:tournamentId").get(verifyJWT, getTournamentLeaderboard);
+router.route("/get-leaderboard/:tournamentId").get(verifyJWT, getTournamentLeaderboard);
 
 export default router;
