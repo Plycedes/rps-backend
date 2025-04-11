@@ -8,6 +8,10 @@ export const createTournament = asyncHandler(async (req, res) => {
     const { name, reward, endDate } = req.body;
     const createdBy = req.user._id;
 
+    if (!req.user.isAdmin) {
+        throw new ApiError(403, "You are not an administrator");
+    }
+
     if (!name || !reward || !endDate) {
         throw new ApiError(400, "Name, reward, and end date are required");
     }

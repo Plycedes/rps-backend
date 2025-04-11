@@ -30,7 +30,7 @@ const tournamentSchema = new mongoose.Schema(
         status: {
             type: String,
             enum: ["pending", "ongoing", "completed"],
-            default: "pending",
+            default: "ongoing",
         },
         winner: {
             type: mongoose.Schema.Types.ObjectId,

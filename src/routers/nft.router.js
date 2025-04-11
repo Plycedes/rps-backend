@@ -17,8 +17,8 @@ router.route("/list").post(verifyJWT, listNFTForSale);
 router.route("/buy").post(verifyJWT, buyNFT);
 router.route("/unlist").post(verifyJWT, unlistNFT);
 
-router.route("/nft/:id").get(getNFTById);
-router.route("/user-nft").get(getNFTsByUser);
-router.route("/nft-for-sale").get(getNFTsForSale);
+router.route("/nft/:id").get(verifyJWT, getNFTById);
+router.route("/user-nft").get(verifyJWT, getNFTsByUser);
+router.route("/nft-for-sale").get(verifyJWT, getNFTsForSale);
 
 export default router;

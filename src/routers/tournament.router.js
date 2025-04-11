@@ -7,7 +7,7 @@ import {
     getActiveTournaments,
     getPreviousTournaments,
     getTournamentLeaderboard,
-} from "../controllers/tournament.controller";
+} from "../controllers/tournament.controller.js";
 
 const router = Router();
 
