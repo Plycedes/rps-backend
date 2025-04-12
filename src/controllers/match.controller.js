@@ -1,0 +1,104 @@
+import { asyncHandler } from "../utils/asyncHandler.js";
+import { Match } from "../models/match.model.js";
+import { Tournament } from "../models/tournament.model.js";
+import { ApiResponse } from "../utils/ApiResponse.js";
+import { ApiError } from "../utils/ApiError.js";
+
+export const createMatch = asyncHandler(async (req, res) => {
+    const { tournamentId, player1, player2 } = req.body;
+    const createdBy = req.user._id;
+
+    if (!tournamentId || !player1 || !player2) {
+        throw new ApiError(400, "Tournament ID and both players are required");
+    }
+
+    const tournament = await Tournament.findById(tournamentId);
+    if (!tournament) {
+        throw new ApiError(404, "Tournament not found");
+    }
+
+    if (!tournament.createdBy.equals(createdBy)) {
+        throw new ApiError(403, "Only the tournament creator can create matches");
+    }
+
+    if (player1 === player2) {
+        throw new ApiError(400, "Players must be different");
+    }
+
+    const match = await Match.create({
+        tournament: tournamentId,
+        player1,
+        player2,
+    });
+
+    return res.status(201).json(new ApiResponse(201, match, "Match created successfully"));
+});
+
+export const getTournamentMatches = asyncHandler(async (req, res) => {
+    const { tournamentId } = req.params;
+
+    const matches = await Match.find({ tournament: tournamentId })
+        .populate("player1", "username")
+        .populate("player2", "username")
+        .populate("winner", "username");
+
+    return res.status(200).json(new ApiResponse(200, matches, "Tournament matches fetched"));
+});
+
+export const getMatchById = asyncHandler(async (req, res) => {
+    const { matchId } = req.params;
+
+    const match = await Match.findById(matchId)
+        .populate("player1", "username")
+        .populate("player2", "username")
+        .populate("winner", "username")
+        .populate("tournament", "name");
+
+    if (!match) throw new ApiError(404, "Match not found");
+
+    return res.status(200).json(new ApiResponse(200, match, "Match details fetched"));
+});
+
+export const updateMatchResult = asyncHandler(async (req, res) => {
+    const { matchId, result } = req.body;
+    const allowedResults = ["player1", "player2", "draw"];
+
+    if (!allowedResults.includes(result)) {
+        throw new ApiError(400, "Invalid match result");
+    }
+
+    const match = await Match.findById(matchId);
+    if (!match) {
+        throw new ApiError(404, "Match not found");
+    }
+
+    if (match.result !== "pending") {
+        throw new ApiError(400, "Match already concluded");
+    }
+
+    let winner = null;
+
+    if (result === "player1") {
+        winner = match.player1;
+    } else if (result === "player2") {
+        winner = match.player2;
+    }
+
+    match.result = result;
+    match.winner = winner;
+    await match.save();
+
+    // Optional: Update participant win count in the tournament
+    if (winner) {
+        const tournament = await Tournament.findById(match.tournament);
+        const participant = tournament.participants.find(
+            (p) => p.user.toString() === winner.toString()
+        );
+        if (participant) {
+            participant.wins += 1;
+            await tournament.save();
+        }
+    }
+
+    return res.status(200).json(new ApiResponse(200, match, "Match result updated successfully"));
+});
