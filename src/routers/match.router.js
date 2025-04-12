@@ -1,11 +1,11 @@
 import { Router } from "express";
-import { verifyJWT } from "../middlewares/auth.middleware";
+import { verifyJWT } from "../middlewares/auth.middleware.js";
 import {
     createMatch,
     getTournamentMatches,
     getMatchById,
     updateMatchResult,
-} from "../controllers/match.controller";
+} from "../controllers/match.controller.js";
 
 const router = Router();
 

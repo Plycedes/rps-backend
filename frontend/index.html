@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <title>RPS Match Test</title>
+    </head>
+    <body>
+        <h2>Rock Paper Scissors Game</h2>
+
+        <label>User ID:</label>
+        <input type="text" id="userId" /><br />
+
+        <label>Tournament ID:</label>
+        <input type="text" id="tournamentId" /><br />
+
+        <button onclick="joinMatch()">Find/Join Match</button>
+
+        <div id="gameSection" style="display: none">
+            <h3>Make a move:</h3>
+            <button onclick="makeMove('rock')">Rock</button>
+            <button onclick="makeMove('paper')">Paper</button>
+            <button onclick="makeMove('scissors')">Scissors</button>
+
+            <h3>Match Updates:</h3>
+            <pre id="resultBox"></pre>
+        </div>
+
+        <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+        <script>
+            const socket = io("http://localhost:8000");
+            let matchId = "";
+            let userId = "";
+
+            function joinMatch() {
+                userId = document.getElementById("userId").value;
+                const tournamentId = document.getElementById("tournamentId").value;
+                socket.emit("findOrCreateMatch", { userId, tournamentId });
+            }
+
+            function makeMove(move) {
+                socket.emit("makeMove", { matchId, userId, move });
+            }
+
+            socket.on("waitingForOpponent", (data) => {
+                matchId = data.matchId;
+                document.getElementById("resultBox").innerText = data.message;
+            });
+
+            socket.on("matchReady", (data) => {
+                matchId = data.matchId;
+                document.getElementById("gameSection").style.display = "block";
+                document.getElementById("resultBox").innerText = "Match found! You can now play.";
+            });
+
+            socket.on("roundResult", (data) => {
+                document.getElementById("resultBox").innerText =
+                    `Round ${data.round} result:\n` + JSON.stringify(data, null, 2);
+            });
+
+            socket.on("matchOver", (data) => {
+                document.getElementById("resultBox").innerText =
+                    "🎉 Match Over!\n" + JSON.stringify(data, null, 2);
+            });
+        </script>
+    </body>
+</html>

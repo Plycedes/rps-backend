@@ -15,7 +15,6 @@ const matchSchema = new mongoose.Schema(
         player2: {
             type: mongoose.Schema.Types.ObjectId,
             ref: "User",
-            required: true,
         },
         winner: {
             type: mongoose.Schema.Types.ObjectId,
