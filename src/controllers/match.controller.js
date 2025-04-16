@@ -1,5 +1,6 @@
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { Match } from "../models/match.model.js";
+import { User } from "../models/user.model.js";
 import { Tournament } from "../models/tournament.model.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { ApiError } from "../utils/ApiError.js";
@@ -101,4 +102,62 @@ export const updateMatchResult = asyncHandler(async (req, res) => {
     }
 
     return res.status(200).json(new ApiResponse(200, match, "Match result updated successfully"));
+});
+
+export const getGlobalLeaderboard = asyncHandler(async (req, res) => {
+    const leaderboard = await User.aggregate([
+        {
+            $match: { isAdmin: false },
+        },
+        {
+            $lookup: {
+                from: "tournaments",
+                localField: "_id",
+                foreignField: "participants.user",
+                as: "tournaments",
+            },
+        },
+        {
+            $addFields: {
+                totalWins: {
+                    $sum: {
+                        $map: {
+                            input: "$tournaments",
+                            as: "t",
+                            in: {
+                                $let: {
+                                    vars: {
+                                        matchedParticipant: {
+                                            $arrayElemAt: [
+                                                {
+                                                    $filter: {
+                                                        input: "$$t.participants",
+                                                        as: "p",
+                                                        cond: { $eq: ["$$p.user", "$_id"] },
+                                                    },
+                                                },
+                                                0,
+                                            ],
+                                        },
+                                    },
+                                    in: "$$matchedParticipant.wins",
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        },
+        {
+            $project: {
+                username: 1,
+                totalWins: 1,
+            },
+        },
+        {
+            $sort: { totalWins: -1 },
+        },
+    ]);
+
+    return res.status(200).json(new ApiResponse(200, leaderboard, "Global leaderboard fetched"));
 });

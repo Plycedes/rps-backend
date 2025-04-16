@@ -337,6 +337,7 @@ export const getTournamentById = asyncHandler(async (req, res) => {
                 winner: {
                     _id: "$winner._id",
                     username: "$winner.username",
+                    avatar: "$winner.avatar",
                 },
                 reward: {
                     _id: "$reward._id",

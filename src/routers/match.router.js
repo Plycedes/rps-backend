@@ -5,6 +5,7 @@ import {
     getTournamentMatches,
     getMatchById,
     updateMatchResult,
+    getGlobalLeaderboard,
 } from "../controllers/match.controller.js";
 
 const router = Router();
@@ -14,5 +15,6 @@ router.route("/update-result").post(verifyJWT, updateMatchResult);
 
 router.route("/get-tournament-matches").get(verifyJWT, getTournamentMatches);
 router.route("/get/:matchId").get(verifyJWT, getMatchById);
+router.route("/leaderboard").get(verifyJWT, getGlobalLeaderboard);
 
 export default router;
