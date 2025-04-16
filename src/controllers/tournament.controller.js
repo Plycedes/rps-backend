@@ -356,3 +356,80 @@ export const getTournamentById = asyncHandler(async (req, res) => {
         .status(200)
         .json(new ApiResponse(200, tournament[0], "Tournament fetched successfully"));
 });
+
+export const getUserTournaments = asyncHandler(async (req, res) => {
+    const userId = req.user._id;
+
+    const tournaments = await Tournament.aggregate([
+        {
+            $match: {
+                status: { $in: ["pending", "ongoing"] },
+                "participants.user": userId,
+            },
+        },
+        {
+            $lookup: {
+                from: "users",
+                localField: "createdBy",
+                foreignField: "_id",
+                as: "createdBy",
+            },
+        },
+        { $unwind: "$createdBy" },
+        {
+            $lookup: {
+                from: "users",
+                localField: "winner",
+                foreignField: "_id",
+                as: "winner",
+            },
+        },
+        {
+            $unwind: {
+                path: "$winner",
+                preserveNullAndEmptyArrays: true,
+            },
+        },
+        {
+            $lookup: {
+                from: "nfts",
+                localField: "reward",
+                foreignField: "_id",
+                as: "reward",
+            },
+        },
+        {
+            $unwind: {
+                path: "$reward",
+                preserveNullAndEmptyArrays: true,
+            },
+        },
+        {
+            $addFields: {
+                participantsCount: { $size: "$participants" },
+            },
+        },
+        {
+            $project: {
+                name: 1,
+                status: 1,
+                endDate: 1,
+                createdAt: 1,
+                updatedAt: 1,
+                "createdBy._id": 1,
+                "createdBy.username": 1,
+                "winner._id": 1,
+                "winner.username": 1,
+                "reward._id": 1,
+                "reward.name": 1,
+                "reward.imageUrl": 1,
+                participantsCount: 1,
+            },
+        },
+        { $sort: { updatedAt: -1 } },
+    ]);
+
+    return res
+        .status(200)
+        .json(new ApiResponse(200, tournaments, "Active tournaments user has joined fetched"));
+});

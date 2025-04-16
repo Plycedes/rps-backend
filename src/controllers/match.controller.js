@@ -151,6 +151,7 @@ export const getGlobalLeaderboard = asyncHandler(async (req, res) => {
         {
             $project: {
                 username: 1,
+                avatar: 1,
                 totalWins: 1,
             },
         },

@@ -8,6 +8,7 @@ import {
     getPreviousTournaments,
     getTournamentLeaderboard,
     getTournamentById,
+    getUserTournaments,
 } from "../controllers/tournament.controller.js";
 
 const router = Router();
@@ -20,5 +21,6 @@ router.route("/get-active").get(verifyJWT, getActiveTournaments);
 router.route("/get-previous").get(verifyJWT, getPreviousTournaments);
 router.route("/get-leaderboard/:tournamentId").get(verifyJWT, getTournamentLeaderboard);
 router.route("/get/:tournamentId").get(verifyJWT, getTournamentById);
+router.route("/get-user").get(verifyJWT, getUserTournaments);
 
 export default router;
