@@ -10,6 +10,7 @@ import {
     getCurrentUser,
     updateUserAvatar,
     updateUserBalance,
+    updateUserWalletAddress,
 } from "../controllers/user.controller.js";
 
 const router = Router();
@@ -24,5 +25,6 @@ router.route("/current-user").get(verifyJWT, getCurrentUser);
 router.route("/change-password").post(verifyJWT, changeCurrentPassword);
 router.route("/update-avatar").post(verifyJWT, upload.single("avatar"), updateUserAvatar);
 router.route("/add-balance").post(verifyJWT, updateUserBalance);
+router.route("/update-wallet").post(verifyJWT, updateUserWalletAddress);
 
 export default router;

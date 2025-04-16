@@ -3,6 +3,7 @@ import { NFT } from "../models/nft.model.js";
 import { Tournament } from "../models/tournament.model.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { ApiError } from "../utils/ApiError.js";
+import mongoose from "mongoose";
 
 export const createTournament = asyncHandler(async (req, res) => {
     const { name, reward, endDate } = req.body;
@@ -122,20 +123,132 @@ export const completeTournament = asyncHandler(async (req, res) => {
 });
 
 export const getActiveTournaments = asyncHandler(async (req, res) => {
-    const tournaments = await Tournament.find({
-        status: { $in: ["pending", "ongoing"] },
-    })
-        .populate("createdBy", "username")
-        .sort({ updatedAt: -1 });
+    const tournaments = await Tournament.aggregate([
+        {
+            $match: {
+                status: { $in: ["pending", "ongoing"] },
+            },
+        },
+        {
+            $sort: { updatedAt: -1 },
+        },
+        {
+            $lookup: {
+                from: "users",
+                localField: "createdBy",
+                foreignField: "_id",
+                as: "createdBy",
+            },
+        },
+        {
+            $unwind: "$createdBy",
+        },
+        {
+            $lookup: {
+                from: "nfts",
+                localField: "reward",
+                foreignField: "_id",
+                as: "reward",
+            },
+        },
+        {
+            $unwind: {
+                path: "$reward",
+                preserveNullAndEmptyArrays: true,
+            },
+        },
+        {
+            $project: {
+                name: 1,
+                status: 1,
+                endDate: 1,
+                participantsCount: { $size: "$participants" },
+                createdAt: 1,
+                updatedAt: 1,
+                createdBy: {
+                    _id: "$createdBy._id",
+                    username: "$createdBy.username",
+                },
+                reward: {
+                    _id: "$reward._id",
+                    name: "$reward.name",
+                    imageUrl: "$reward.imageUrl",
+                },
+            },
+        },
+    ]);
 
     return res.status(200).json(new ApiResponse(200, tournaments, "Active tournaments fetched"));
 });
 
 export const getPreviousTournaments = asyncHandler(async (req, res) => {
-    const tournaments = await Tournament.find({ status: "completed" })
-        .populate("createdBy", "username")
-        .populate("winner", "username")
-        .sort({ updatedAt: -1 });
+    const tournaments = await Tournament.aggregate([
+        {
+            $match: { status: "completed" },
+        },
+        {
+            $sort: { updatedAt: -1 },
+        },
+        {
+            $lookup: {
+                from: "users",
+                localField: "createdBy",
+                foreignField: "_id",
+                as: "createdBy",
+            },
+        },
+        {
+            $unwind: "$createdBy",
+        },
+        {
+            $lookup: {
+                from: "users",
+                localField: "winner",
+                foreignField: "_id",
+                as: "winner",
+            },
+        },
+        {
+            $unwind: "$winner",
+        },
+        {
+            $lookup: {
+                from: "nfts",
+                localField: "reward",
+                foreignField: "_id",
+                as: "reward",
+            },
+        },
+        {
+            $unwind: {
+                path: "$reward",
+                preserveNullAndEmptyArrays: true,
+            },
+        },
+        {
+            $project: {
+                name: 1,
+                status: 1,
+                endDate: 1,
+                participantsCount: { $size: "$participants" },
+                createdAt: 1,
+                updatedAt: 1,
+                createdBy: {
+                    _id: "$createdBy._id",
+                    username: "$createdBy.username",
+                },
+                winner: {
+                    _id: "$winner._id",
+                    username: "$winner.username",
+                },
+                reward: {
+                    _id: "$reward._id",
+                    name: "$reward.name",
+                    imageUrl: "$reward.imageUrl",
+                },
+            },
+        },
+    ]);
 
     return res.status(200).json(new ApiResponse(200, tournaments, "Previous tournaments fetched"));
 });
@@ -157,4 +270,88 @@ export const getTournamentLeaderboard = asyncHandler(async (req, res) => {
     return res
         .status(200)
         .json(new ApiResponse(200, leaderboard, "Tournament leaderboard fetched"));
+});
+
+export const getTournamentById = asyncHandler(async (req, res) => {
+    const { tournamentId } = req.params;
+
+    if (!tournamentId) {
+        throw new ApiError(400, "Tournament ID is required");
+    }
+
+    const tournament = await Tournament.aggregate([
+        {
+            $match: { _id: new mongoose.Types.ObjectId(tournamentId) },
+        },
+        {
+            $lookup: {
+                from: "users",
+                localField: "createdBy",
+                foreignField: "_id",
+                as: "createdBy",
+            },
+        },
+        {
+            $unwind: "$createdBy",
+        },
+        {
+            $lookup: {
+                from: "users",
+                localField: "winner",
+                foreignField: "_id",
+                as: "winner",
+            },
+        },
+        {
+            $unwind: {
+                path: "$winner",
+                preserveNullAndEmptyArrays: true,
+            },
+        },
+        {
+            $lookup: {
+                from: "nfts",
+                localField: "reward",
+                foreignField: "_id",
+                as: "reward",
+            },
+        },
+        {
+            $unwind: {
+                path: "$reward",
+                preserveNullAndEmptyArrays: true,
+            },
+        },
+        {
+            $project: {
+                name: 1,
+                status: 1,
+                endDate: 1,
+                participantsCount: { $size: "$participants" },
+                createdAt: 1,
+                updatedAt: 1,
+                createdBy: {
+                    _id: "$createdBy._id",
+                    username: "$createdBy.username",
+                },
+                winner: {
+                    _id: "$winner._id",
+                    username: "$winner.username",
+                },
+                reward: {
+                    _id: "$reward._id",
+                    name: "$reward.name",
+                    imageUrl: "$reward.imageUrl",
+                },
+            },
+        },
+    ]);
+
+    if (!tournament || tournament.length === 0) {
+        throw new ApiError(404, "Tournament not found");
+    }
+
+    return res
+        .status(200)
+        .json(new ApiResponse(200, tournament[0], "Tournament fetched successfully"));
 });

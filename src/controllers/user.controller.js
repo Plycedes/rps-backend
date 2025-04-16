@@ -188,9 +188,91 @@ export const changeCurrentPassword = asyncHandler(async (req, res) => {
 });
 
 export const getCurrentUser = asyncHandler(async (req, res) => {
-    return res
-        .status(200)
-        .json(new ApiResponse(200, req.user, "Current User fetched successfully "));
+    const userId = req.user._id;
+    const user = await User.aggregate([
+        { $match: { _id: userId } },
+        {
+            $lookup: {
+                from: "tournaments",
+                let: { userId: "$_id" },
+                pipeline: [
+                    {
+                        $match: {
+                            $expr: {
+                                $in: ["$$userId", "$participants.user"],
+                            },
+                        },
+                    },
+                    {
+                        $project: {
+                            won: { $cond: [{ $eq: ["$winner", "$$userId"] }, 1, 0] },
+                        },
+                    },
+                ],
+                as: "tournaments",
+            },
+        },
+        {
+            $lookup: {
+                from: "matches",
+                let: { userId: "$_id" },
+                pipeline: [
+                    {
+                        $match: {
+                            $expr: {
+                                $or: [
+                                    { $eq: ["$player1", "$$userId"] },
+                                    { $eq: ["$player2", "$$userId"] },
+                                ],
+                            },
+                        },
+                    },
+                    {
+                        $project: {
+                            isWin: { $cond: [{ $eq: ["$winner", "$$userId"] }, 1, 0] },
+                            isDraw: { $cond: [{ $eq: ["$result", "draw"] }, 1, 0] },
+                        },
+                    },
+                ],
+                as: "matches",
+            },
+        },
+        {
+            $lookup: {
+                from: "nfts",
+                localField: "_id",
+                foreignField: "owner",
+                as: "nfts",
+            },
+        },
+        {
+            $addFields: {
+                tournamentsParticipated: { $size: "$tournaments" },
+                tournamentsWon: {
+                    $sum: "$tournaments.won",
+                },
+                matchesPlayed: { $size: "$matches" },
+                matchesWon: { $sum: "$matches.isWin" },
+                matchesDrawn: { $sum: "$matches.isDraw" },
+                nftsOwned: { $size: "$nfts" },
+            },
+        },
+        {
+            $project: {
+                password: 0,
+                refreshToken: 0,
+                tournaments: 0,
+                matches: 0,
+                nfts: 0,
+            },
+        },
+    ]);
+
+    if (!user || user.length === 0) {
+        return res.status(404).json(new ApiResponse(404, null, "User not found"));
+    }
+
+    return res.status(200).json(new ApiResponse(200, user[0], "User stats fetched successfully"));
 });
 
 export const updateUserAvatar = asyncHandler(async (req, res) => {
@@ -251,4 +333,23 @@ export const updateUserBalance = asyncHandler(async (req, res) => {
     return res
         .status(200)
         .json(new ApiResponse(200, { balance: user.balance }, "Balance updated successfully"));
+});
+
+export const updateUserWalletAddress = asyncHandler(async (req, res) => {
+    const { walletId } = req.body;
+    const userId = req.user._id;
+
+    const user = await User.findById(userId);
+    if (!user) {
+        throw new ApiError(404, "User not found");
+    }
+
+    user.walletId = walletId;
+    await user.save();
+
+    return res
+        .status(200)
+        .json(
+            new ApiResponse(200, { walletId: user.walletId }, "Wallet address updated successfully")
+        );
 });
