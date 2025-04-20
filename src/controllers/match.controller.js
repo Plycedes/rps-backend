@@ -162,3 +162,99 @@ export const getGlobalLeaderboard = asyncHandler(async (req, res) => {
 
     return res.status(200).json(new ApiResponse(200, leaderboard, "Global leaderboard fetched"));
 });
+
+export const getUserMatches = asyncHandler(async (req, res) => {
+    const userId = req.user._id;
+
+    const matches = await Match.aggregate([
+        {
+            $match: {
+                $or: [{ player1: userId }, { player2: userId }],
+            },
+        },
+        {
+            $lookup: {
+                from: "tournaments",
+                localField: "tournament",
+                foreignField: "_id",
+                as: "tournament",
+            },
+        },
+        { $unwind: "$tournament" },
+        {
+            $addFields: {
+                opponentId: {
+                    $cond: [{ $eq: ["$player1", userId] }, "$player2", "$player1"],
+                },
+            },
+        },
+        {
+            $lookup: {
+                from: "users",
+                localField: "opponentId",
+                foreignField: "_id",
+                as: "opponent",
+            },
+        },
+        { $unwind: "$opponent" },
+        {
+            $lookup: {
+                from: "users",
+                localField: "winner",
+                foreignField: "_id",
+                as: "winner",
+            },
+        },
+        {
+            $unwind: {
+                path: "$winner",
+                preserveNullAndEmptyArrays: true,
+            },
+        },
+        {
+            $addFields: {
+                outcome: {
+                    $switch: {
+                        branches: [
+                            {
+                                case: { $eq: ["$result", "draw"] },
+                                then: "draw",
+                            },
+                            {
+                                case: {
+                                    $and: [
+                                        { $ne: ["$result", "pending"] },
+                                        { $eq: ["$winner._id", userId] },
+                                    ],
+                                },
+                                then: "won",
+                            },
+                            {
+                                case: {
+                                    $and: [
+                                        { $ne: ["$result", "pending"] },
+                                        { $ne: ["$winner._id", userId] },
+                                    ],
+                                },
+                                then: "lost",
+                            },
+                        ],
+                        default: "pending",
+                    },
+                },
+            },
+        },
+        {
+            $project: {
+                _id: 1,
+                tournament: "$tournament.name",
+                opponent: "$opponent.username",
+                outcome: 1,
+                createdAt: 1,
+            },
+        },
+        { $sort: { createdAt: -1 } },
+    ]);
+
+    return res.status(200).json(new ApiResponse(200, matches, "User's matches summary fetched"));
+});
