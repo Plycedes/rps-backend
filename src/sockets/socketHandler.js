@@ -1,6 +1,7 @@
 import { Match } from "../models/match.model.js";
 import { Tournament } from "../models/tournament.model.js";
 
+const tournamentLobbies = new Map();
 const activeGames = new Map();
 
 export default function setupSocketHandlers(io) {
@@ -11,58 +12,59 @@ export default function setupSocketHandlers(io) {
             socket.userId = userId;
             console.log("Player trying to connect:", userId);
 
-            let match = await Match.findOne({
-                tournament: tournamentId,
-                player2: null,
-            });
+            // Create a new lobby queue for the tournament if it doesn't exist
+            if (!tournamentLobbies.has(tournamentId)) {
+                tournamentLobbies.set(tournamentId, []);
+            }
 
-            if (match) {
-                // Join as second player
-                match.player2 = userId;
-                await match.save();
-                socket.matchId = match._id.toString();
-                socket.join(socket.matchId);
+            const lobbyQueue = tournamentLobbies.get(tournamentId);
+            lobbyQueue.push({ userId, socketId: socket.id });
 
-                // Save socket IDs for both players
-                const existingGame = activeGames.get(socket.matchId);
-                if (existingGame) {
-                    existingGame.player2SocketId = socket.id;
-                }
+            if (lobbyQueue.length >= 2) {
+                const player1 = lobbyQueue.shift();
+                const player2 = lobbyQueue.shift();
 
-                // Notify both players match is ready
-                io.to(socket.matchId).emit("matchReady", {
-                    matchId: socket.matchId,
-                    player1: match.player1,
-                    player2: match.player2,
-                });
-
-                console.log(`User ${userId} joined existing match ${socket.matchId}`);
-            } else {
-                // Create new match as player1
-                match = await Match.create({
+                // Create a match in the database
+                const match = await Match.create({
                     tournament: tournamentId,
-                    player1: userId,
-                    player2: null,
+                    player1: player1.userId,
+                    player2: player2.userId,
                 });
 
-                socket.matchId = match._id.toString();
-                socket.join(socket.matchId);
+                const matchId = match._id.toString();
 
-                activeGames.set(socket.matchId, {
-                    player1: userId,
-                    player2: null,
-                    player1SocketId: socket.id,
-                    player2SocketId: null,
+                const player1Socket = io.sockets.sockets.get(player1.socketId);
+                const player2Socket = io.sockets.sockets.get(player2.socketId);
+
+                player1Socket.join(matchId);
+                player2Socket.join(matchId);
+
+                player1Socket.matchId = matchId;
+                player2Socket.matchId = matchId;
+
+                activeGames.set(matchId, {
+                    player1: player1.userId,
+                    player2: player2.userId,
+                    player1SocketId: player1.socketId,
+                    player2SocketId: player2.socketId,
                     moves: {},
                     scores: {},
                 });
 
-                socket.emit("waitingForOpponent", {
-                    matchId: socket.matchId,
-                    message: "Waiting for an opponent...",
+                io.to(matchId).emit("matchReady", {
+                    matchId,
+                    player1: player1.userId,
+                    player2: player2.userId,
                 });
 
-                console.log(`User ${userId} created and joined new match ${socket.matchId}`);
+                console.log(
+                    `Created match ${matchId} between ${player1.userId} and ${player2.userId} in tournament ${tournamentId}`
+                );
+            } else {
+                socket.emit("waitingForOpponent", {
+                    message: "Waiting for an opponent in this tournament...",
+                });
+                console.log(`User ${userId} is waiting for opponent in tournament ${tournamentId}`);
             }
         });
 
@@ -84,106 +86,117 @@ export default function setupSocketHandlers(io) {
             game.moves[userId] = move;
 
             const opponentId = userId === game.player1 ? game.player2 : game.player1;
-
             const opponentSocketId =
                 userId === game.player1 ? game.player2SocketId : game.player1SocketId;
 
-            // Tell this player to wait
-            socket.emit("waitingForOpponentChoice");
+            console.log(`${userId} with ${socket.id} chose ${move}`);
+            console.log(`${opponentId} made move ${game.moves[opponentId]}`);
 
-            // If opponent has already played
-            if (opponentId && game.moves[opponentId]) {
-                const playerMove = game.moves[userId];
-                const opponentMove = game.moves[opponentId];
+            const playerMove = game.moves[userId];
+            const opponentMove = game.moves[opponentId];
 
-                // Determine winner
-                const winnerId = getWinner(userId, opponentId, playerMove, opponentMove);
+            if (!opponentMove) {
+                const playerSocket = io.sockets.sockets.get(socket.id);
+                playerSocket?.emit("waitingForOpponentChoice");
+                return;
+            }
 
-                // Update scores
-                game.scores[userId] = (game.scores[userId] || 0) + (winnerId === userId ? 1 : 0);
-                game.scores[opponentId] =
-                    (game.scores[opponentId] || 0) + (winnerId === opponentId ? 1 : 0);
+            const winnerId = getWinner(userId, opponentId, playerMove, opponentMove);
 
-                // Send individual results
-                const playerSocket = io.sockets.sockets.get(
-                    game.player1 === userId ? game.player1SocketId : game.player2SocketId
-                );
-                const opponentSocket = io.sockets.sockets.get(opponentSocketId);
+            game.scores[userId] = (game.scores[userId] || 0) + (winnerId === userId ? 1 : 0);
+            game.scores[opponentId] =
+                (game.scores[opponentId] || 0) + (winnerId === opponentId ? 1 : 0);
 
-                // Send round result to each player
-                playerSocket?.emit("roundResult", {
-                    winnerId,
-                    playerChoice: playerMove,
-                    opponentChoice: opponentMove,
+            const playerSocket = io.sockets.sockets.get(
+                game.player1 === userId ? game.player1SocketId : game.player2SocketId
+            );
+            const opponentSocket = io.sockets.sockets.get(
+                game.player1 === opponentId ? game.player1SocketId : game.player2SocketId
+            );
+
+            playerSocket?.emit("roundResult", {
+                winnerId,
+                playerChoice: playerMove,
+                opponentChoice: opponentMove,
+                scores: game.scores,
+            });
+
+            opponentSocket?.emit("roundResult", {
+                winnerId,
+                playerChoice: opponentMove,
+                opponentChoice: playerMove,
+                scores: game.scores,
+            });
+
+            const totalRounds = game.scores[userId] + game.scores[opponentId];
+            if (totalRounds >= 3) {
+                const finalWinner =
+                    game.scores[userId] > game.scores[opponentId]
+                        ? userId
+                        : game.scores[userId] < game.scores[opponentId]
+                          ? opponentId
+                          : "draw";
+
+                playerSocket?.emit("finalResult", {
+                    winnerId: finalWinner,
                     scores: game.scores,
                 });
 
-                opponentSocket?.emit("roundResult", {
-                    winnerId,
-                    playerChoice: opponentMove,
-                    opponentChoice: playerMove,
+                opponentSocket?.emit("finalResult", {
+                    winnerId: finalWinner,
                     scores: game.scores,
                 });
 
-                // Check if game is over (3 rounds max)
-                const totalRounds = game.scores[userId] + game.scores[opponentId];
-                if (totalRounds >= 3) {
-                    const finalWinner =
-                        game.scores[userId] > game.scores[opponentId]
-                            ? userId
-                            : game.scores[userId] < game.scores[opponentId]
-                              ? opponentId
-                              : "draw";
-
-                    playerSocket?.emit("finalResult", {
-                        winnerId: finalWinner,
-                        scores: game.scores,
-                    });
-
-                    opponentSocket?.emit("finalResult", {
-                        winnerId: finalWinner,
-                        scores: game.scores,
-                    });
-
-                    try {
-                        const match = await Match.findById(matchId);
-                        if (match) {
-                            if (finalWinner === "draw") {
-                                match.winner = undefined;
-                                match.result = "draw";
-                            } else if (String(finalWinner) === String(match.player1)) {
-                                match.winner = finalWinner;
-                                match.result = "player1";
-                            } else if (String(finalWinner) === String(match.player2)) {
-                                match.winner = finalWinner;
-                                match.result = "player2";
-                            }
-                            await match.save();
-                            console.log(`Match ${matchId} updated with result: ${match.result}`);
+                try {
+                    const match = await Match.findById(matchId);
+                    if (match) {
+                        if (finalWinner === "draw") {
+                            match.winner = undefined;
+                            match.result = "draw";
+                        } else if (String(finalWinner) === String(match.player1)) {
+                            match.winner = finalWinner;
+                            match.result = "player1";
+                        } else if (String(finalWinner) === String(match.player2)) {
+                            match.winner = finalWinner;
+                            match.result = "player2";
                         }
-                        const tournament = await Tournament.findById(match.tournament);
-                        const participant = tournament.participants.find(
-                            (p) => p.user.toString() === finalWinner
-                        );
-                        if (participant) {
-                            participant.wins += 1;
-                            await tournament.save();
-                        }
-                    } catch (err) {
-                        console.error("Failed to update match result:", err);
+                        await match.save();
+                        console.log(`Match ${matchId} updated with result: ${match.result}`);
                     }
 
-                    activeGames.delete(matchId);
+                    const tournament = await Tournament.findById(match.tournament);
+                    const participant = tournament.participants.find(
+                        (p) => p.user.toString() === finalWinner
+                    );
+                    if (participant) {
+                        participant.wins += 1;
+                        await tournament.save();
+                    }
+                } catch (err) {
+                    console.error("Failed to update match result:", err);
                 }
 
-                // Clear moves for next round
+                activeGames.delete(matchId);
+            } else {
+                // Reset for next round
                 game.moves = {};
             }
         });
 
         socket.on("disconnect", () => {
             console.log(`Socket ${socket.id} disconnected`);
-            // Optionally: Handle cleanup
+
+            // Remove from any tournament lobby
+            for (const [tournamentId, lobbyQueue] of tournamentLobbies.entries()) {
+                const index = lobbyQueue.findIndex((p) => p.socketId === socket.id);
+                if (index !== -1) {
+                    lobbyQueue.splice(index, 1);
+                    console.log(
+                        `Removed user ${socket.userId} from lobby of tournament ${tournamentId}`
+                    );
+                    break;
+                }
+            }
         });
     });
 }
