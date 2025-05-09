@@ -37,6 +37,9 @@ export const createTournament = asyncHandler(async (req, res) => {
         endDate: new Date(endDate),
     });
 
+    nft.tournament = tournament._id;
+    await nft.save();
+
     return res
         .status(201)
         .json(new ApiResponse(201, tournament, "Tournament created successfully"));

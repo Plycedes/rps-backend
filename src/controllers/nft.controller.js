@@ -3,12 +3,21 @@ import { NFT } from "../models/nft.model.js";
 import { User } from "../models/user.model.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { ApiError } from "../utils/ApiError.js";
+import { uploadOnCloudinary } from "../utils/cloudinary.js";
 
 export const mintNFT = asyncHandler(async (req, res) => {
     if (!req.user.isAdmin) {
         throw new ApiError(403, "You are not allowed to mint NFTs");
     }
-    const { name, description, imageUrl } = req.body;
+    const { name, description } = req.body;
+
+    const nftLocalPath = req.file?.path;
+
+    if (!nftLocalPath) {
+        throw new ApiError(400, "NFT image is missing");
+    }
+
+    const nft = await uploadOnCloudinary(nftLocalPath);
 
     const adminId = req.user._id;
 
@@ -16,7 +25,7 @@ export const mintNFT = asyncHandler(async (req, res) => {
         owner: adminId,
         name,
         description,
-        imageUrl,
+        imageUrl: nft.secure_url,
     });
 
     return res.status(201).json(new ApiResponse(201, newNFT, "NFT minted and owned by admin"));

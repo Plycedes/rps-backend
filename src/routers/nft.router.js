@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { verifyJWT } from "../middlewares/auth.middleware.js";
+import { upload } from "../middlewares/multer.middleware.js";
 import {
     mintNFT,
     listNFTForSale,
@@ -12,7 +13,7 @@ import {
 
 const router = Router();
 
-router.route("/mint").post(verifyJWT, mintNFT);
+router.route("/mint").post(verifyJWT, upload.single("nftImg"), mintNFT);
 router.route("/list").post(verifyJWT, listNFTForSale);
 router.route("/buy").post(verifyJWT, buyNFT);
 router.route("/unlist").post(verifyJWT, unlistNFT);
