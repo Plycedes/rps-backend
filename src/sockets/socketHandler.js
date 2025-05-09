@@ -183,7 +183,7 @@ export default function setupSocketHandlers(io) {
             }
         });
 
-        socket.on("disconnect", () => {
+        socket.on("disconnect", async () => {
             console.log(`Socket ${socket.id} disconnected`);
 
             // Remove from any tournament lobby
@@ -195,6 +195,59 @@ export default function setupSocketHandlers(io) {
                         `Removed user ${socket.userId} from lobby of tournament ${tournamentId}`
                     );
                     break;
+                }
+            }
+
+            // Handle disconnection during an active match
+            if (socket.matchId) {
+                const game = activeGames.get(socket.matchId);
+
+                if (game) {
+                    const disconnectedUserId = socket.userId;
+                    const opponentId =
+                        disconnectedUserId === game.player1 ? game.player2 : game.player1;
+                    const opponentSocketId =
+                        disconnectedUserId === game.player1
+                            ? game.player2SocketId
+                            : game.player1SocketId;
+
+                    const opponentSocket = io.sockets.sockets.get(opponentSocketId);
+
+                    if (opponentSocket) {
+                        opponentSocket.emit("opponentDisconnected", {
+                            message: "Your opponent has disconnected. You win automatically.",
+                        });
+                    }
+
+                    try {
+                        const match = await Match.findById(socket.matchId);
+                        if (match) {
+                            match.winner = opponentId;
+                            match.result =
+                                String(opponentId) === String(match.player1)
+                                    ? "player1"
+                                    : "player2";
+                            await match.save();
+                            console.log(
+                                `Match ${socket.matchId} ended because of disconnection. Winner: ${opponentId}`
+                            );
+                        }
+
+                        const tournament = await Tournament.findById(match.tournament);
+                        if (tournament) {
+                            const participant = tournament.participants.find(
+                                (p) => p.user.toString() === opponentId
+                            );
+                            if (participant) {
+                                participant.wins += 1;
+                                await tournament.save();
+                            }
+                        }
+                    } catch (err) {
+                        console.error("Failed to update match result after disconnect:", err);
+                    }
+
+                    activeGames.delete(socket.matchId);
                 }
             }
         });

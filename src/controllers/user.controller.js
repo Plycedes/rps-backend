@@ -27,7 +27,7 @@ export const registerUser = asyncHandler(async (req, res) => {
         username,
         email,
         password,
-        avatar: pfp.url,
+        avatar: pfp.secure_url,
         avatarId: pfp.public_id,
         isAdmin,
     });
