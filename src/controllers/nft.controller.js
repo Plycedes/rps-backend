@@ -101,6 +101,19 @@ export const buyNFT = asyncHandler(async (req, res) => {
     return res.status(200).json(new ApiResponse(200, nft, "NFT purchased successfully"));
 });
 
+export const setNFTTokenId = asyncHandler(async (req, res) => {
+    const { nftId, tokenId } = req.body;
+    const userId = req.user._id;
+
+    const nft = await NFT.findById(nftId);
+    if (!nft) throw new ApiError(404, "NFT not found");
+
+    nft.tokenId = tokenId;
+    await nft.save();
+
+    return res.status(200).json(new ApiResponse(200, nft, "NFT tokenId updated successfully"));
+});
+
 export const getNFTsByUser = asyncHandler(async (req, res) => {
     const userId = req.user._id;
 

@@ -30,6 +30,10 @@ const nftSchema = new mongoose.Schema(
             type: Number,
             default: 0,
         },
+        tokenId: {
+            type: Number,
+            default: null,
+        },
     },
     { timestamps: true }
 );
