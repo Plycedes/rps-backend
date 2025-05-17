@@ -100,11 +100,13 @@ export const completeTournament = asyncHandler(async (req, res) => {
     }
 
     const winnerUserId = winnerParticipant?.user._id;
+    const winnerWalletId = winnerParticipant?.user.walletId;
     if (!winnerUserId) {
         throw new ApiError(400, "No participants with wins to determine a winner");
     }
 
     const rewardNFT = await NFT.findById(tournament.reward._id);
+    const nftTokenId = rewardNFT.tokenId;
     rewardNFT.owner = winnerUserId;
     rewardNFT.isListedForSale = false;
     rewardNFT.price = 0;
@@ -119,7 +121,7 @@ export const completeTournament = asyncHandler(async (req, res) => {
         .json(
             new ApiResponse(
                 200,
-                tournament,
+                { tournament, winnerWalletId, nftTokenId },
                 "Tournament marked as completed and reward transferred"
             )
         );

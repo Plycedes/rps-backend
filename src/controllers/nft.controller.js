@@ -103,7 +103,6 @@ export const buyNFT = asyncHandler(async (req, res) => {
 
 export const setNFTTokenId = asyncHandler(async (req, res) => {
     const { nftId, tokenId } = req.body;
-    const userId = req.user._id;
 
     const nft = await NFT.findById(nftId);
     if (!nft) throw new ApiError(404, "NFT not found");
